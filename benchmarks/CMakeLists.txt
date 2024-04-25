@@ -21,7 +21,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 cmake_minimum_required(VERSION 3.20)
-project(pubsub VERSION 0.1.0 LANGUAGES CXX)
+project(benchmark VERSION 0.1.0 LANGUAGES CXX)
 
 find_package(up-client-zenoh-cpp REQUIRED)
 if(BUILD_UNBUNDLED)
@@ -38,18 +38,62 @@ else()
 endif()
 
 
-# sub
-add_executable(sub src/main_sub.cpp)
-target_link_libraries(sub
-    PRIVATE
+
+# bench
+add_executable(benc 
+        src/main.cpp
+        src/sub.h
+        src/pub.h
+        src/utils.h
+        src/filesys.h)
+target_link_libraries(benc
+        PRIVATE
         up-client-zenoh-cpp::up-client-zenoh-cpp
         ${ZENOH_LIBRARY}
         )
 
-# pub
-add_executable(pub src/main_pub.cpp)
-target_link_libraries(pub
-    PRIVATE
+add_executable(start_time
+        src/start_time.cpp
+        src/utils.h
+        src/filesys.h)
+target_link_libraries(start_time
+        PRIVATE
         up-client-zenoh-cpp::up-client-zenoh-cpp
         ${ZENOH_LIBRARY}
         )
+set_target_properties(start_time PROPERTIES LINKER_LANGUAGE CXX)
+
+
+add_executable(pub_test
+        src/pub_test.cpp
+        src/utils.h
+        src/filesys.h)
+target_link_libraries(pub_test
+        PRIVATE
+        up-client-zenoh-cpp::up-client-zenoh-cpp
+        ${ZENOH_LIBRARY}
+        )
+set_target_properties(pub_test PROPERTIES LINKER_LANGUAGE CXX)
+
+add_executable(sub_test
+        src/sub_tests.cpp
+        src/utils.h
+        src/filesys.h)
+target_link_libraries(sub_test
+        PRIVATE
+        up-client-zenoh-cpp::up-client-zenoh-cpp
+        ${ZENOH_LIBRARY}
+        )
+set_target_properties(sub_test PROPERTIES LINKER_LANGUAGE CXX)
+
+add_executable(run_tests
+        src/run_tests.cpp
+        src/utils.h
+        src/filesys.h)
+target_link_libraries(run_tests
+        PRIVATE
+        up-client-zenoh-cpp::up-client-zenoh-cpp
+        ${ZENOH_LIBRARY}
+        )
+set_target_properties(run_tests PROPERTIES LINKER_LANGUAGE CXX)
+

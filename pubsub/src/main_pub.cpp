@@ -31,9 +31,13 @@
 #include <spdlog/spdlog.h>
 #include <up-client-zenoh-cpp/transport/zenohUTransport.h>
 #include <up-cpp/uuid/factory/Uuidv8Factory.h>
+#include <up-cpp/transport/builder/UAttributesBuilder.h>
 #include <up-cpp/uri/serializer/LongUriSerializer.h>
+#include <up-cpp/transport/datamodel/UMessage.h>
+
 #include <up-core-api/ustatus.pb.h>
 #include <up-core-api/uri.pb.h>
+#include "uri.h"
 
 using namespace uprotocol::utransport;
 using namespace uprotocol::uri;
@@ -53,18 +57,16 @@ void signalHandler(int signal) {
     }
 }
 
-std::uint8_t* getTime() {
-
+static inline auto getTime() -> std::uint8_t* {
     auto currentTime = std::chrono::system_clock::now();
     auto duration = currentTime.time_since_epoch();
     auto timeMilli = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
     static std::uint8_t buf[8];
     std::memcpy(buf, &timeMilli, sizeof(timeMilli));
-
     return buf;
 }
 
-std::uint8_t* getRandom() {
+static inline std::uint8_t* getRandom() {
     
     int32_t val = std::rand();
     static std::uint8_t buf[4];
@@ -73,70 +75,86 @@ std::uint8_t* getRandom() {
     return buf;
 }
 
-std::uint8_t* getCounter() {
-    
+static inline std::uint8_t* getCounter() {
     static std::uint8_t counter = 0;
     ++counter;
 
     return &counter;
 }
 
-UCode sendMessage(ZenohUTransport *transport,
-                  UUri &uri,
-                  std::uint8_t *buffer,
-                  size_t size) {
-   
-    auto uuid = Uuidv8Factory::create();
-   
-    UAttributesBuilder builder(uuid, UMessageType::PUBLISH, UPriority::STANDARD);
-    UAttributes attributes = builder.build();
-   
-    UPayload payload(buffer, size, UPayloadType::VALUE);
-   
-    UStatus status = transport->send(uri, payload, attributes);
-    if (UCode::OK != status.code()) {
-        spdlog::error("send.send failed");
-        return UCode::UNAVAILABLE;
-    }
-    return UCode::OK;
-}
 
+class Publisher : public  ZenohUTransport {
+public :
+    Publisher(ZenohSessionManagerConfig &config) : ZenohUTransport(config) {
+    }
+    
+    UCode sendMessage(UUri &uri,
+                      std::uint8_t *buffer,
+                      size_t size) {
+        
+        auto uuid = Uuidv8Factory::create();
+        
+        UAttributesBuilder builder(uri, uuid, UMessageType::UMESSAGE_TYPE_PUBLISH, UPriority::UPRIORITY_CS2);
+        UAttributes attributes = builder.build();
+        
+        UPayload payload(buffer, size, UPayloadType::VALUE);
+        
+        UMessage umsg(payload, attributes);
+        
+        //virtual uprotocol::v1::UStatus send(const uprotocol::utransport::UMessage &message) = 0;
+        UStatus status = send(umsg);
+        if (UCode::OK != status.code()) {
+            spdlog::error("send.send failed");
+            return UCode::UNAVAILABLE;
+        }
+        return UCode::OK;
+    }
+    
+    inline auto getSuccess() -> uprotocol::v1::UStatus {
+      return uSuccess_;
+    }
+    
+    ~Publisher() {
+    }
+};
 /* The sample pub applications demonstrates how to send data using uTransport -
  * There are three topics that are published - random number, current time and a counter */
 int main(int argc, char **argv) {
 
     signal(SIGINT, signalHandler);
     
-    UStatus status;
-    ZenohUTransport *transport = &ZenohUTransport::instance();
-
-    /* Initialize zenoh utransport */
-    status = transport->init();
-    if (UCode::OK != status.code()) {
+    ZenohSessionManagerConfig config{};
+    //config.listenKey = "[\"unixpipe/pub.pipe\"]";
+    //config.connectKey = "[\"unixpipe/pub.pipe\"]";
+    Publisher *pub = new Publisher(config); 
+    if (UCode::OK != (pub->getSuccess()).code()) {
         spdlog::error("ZenohUTransport init failed");
         return -1;
     }
     
     /* Create URI objects from string URI*/
-    auto timeUri = LongUriSerializer::deserialize(TIME_URI_STRING);
-    auto randomUri = LongUriSerializer::deserialize(RANDOM_URI_STRING);
-    auto counterUri = LongUriSerializer::deserialize(COUNTER_URI_STRING);
+    //auto timeUri = LongUriSerializer::deserialize(TIME_URI_STRING);
+    auto timeUri = buildMicrouri(time_id, 2);
+    //auto randomUri = LongUriSerializer::deserialize(RANDOM_URI_STRING);
+    auto randomUri = buildMicrouri(rand_id, 1);
+    //auto counterUri = LongUriSerializer::deserialize(COUNTER_URI_STRING);
+    auto counterUri = buildMicrouri(count_id, 4);
 
     while (!gTerminate) {
         /* send current time in milliseconds */
-        if (UCode::OK != sendMessage(transport, timeUri, getTime(), 8)) {
+        if (UCode::OK != pub->sendMessage(timeUri, getTime(), 8)) {
             spdlog::error("sendMessage failed");
             break;
         }
 
         /* send random number */
-        if (UCode::OK != sendMessage(transport, randomUri, getRandom(), 4)) {
+        if (UCode::OK != pub->sendMessage(randomUri, getRandom(), 4)) {
             spdlog::error("sendMessage failed");
             break;
         }
 
         /* send counter */
-        if (UCode::OK != sendMessage(transport, counterUri, getCounter(), 1)) {
+        if (UCode::OK != pub->sendMessage(counterUri, getCounter(), 1)) {
             spdlog::error("sendMessage failed");
             break;
         }
@@ -145,11 +163,7 @@ int main(int argc, char **argv) {
     }
 
      /* Terminate zenoh utransport */
-    status = transport->term();
-    if (UCode::OK != status.code()) {
-        spdlog::error("ZenohUTransport term failed");
-        return -1;
-    }
-
+    delete pub;
+ 
     return 0;
 }

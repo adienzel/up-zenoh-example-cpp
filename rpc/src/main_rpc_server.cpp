@@ -28,11 +28,17 @@
 #include <up-client-zenoh-cpp/transport/zenohUTransport.h>
 #include <up-cpp/uuid/factory/Uuidv8Factory.h>
 #include <up-cpp/uri/serializer/LongUriSerializer.h>
+#include <up-cpp/transport/builder/UAttributesBuilder.h>
+#include <up-cpp/uri/serializer/MicroUriSerializer.h>
+#include <up-cpp/transport/datamodel/UMessage.h>
+#include "RpcServer.h"
+
 #include <spdlog/spdlog.h>
 
 using namespace uprotocol::utransport;
 using namespace uprotocol::uuid;
 using namespace uprotocol::uri;
+using namespace uprotocol::v1;
 
 bool gTerminate = false;
 
@@ -44,51 +50,72 @@ void signalHandler(int signal) {
 }
 
 class RpcListener : public UListener {
-
     public:
-        UStatus onReceive(const UUri& uri,
-                          const UPayload& payload,
-                          const UAttributes& attributes) const override {
-            
-            /* Construct response payload with the current time */
-            auto currentTime = std::chrono::system_clock::now();
-            auto duration = currentTime.time_since_epoch();
-            uint64_t currentTimeMilli = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-
-            UPayload responsePayload(reinterpret_cast<const uint8_t*>(&currentTimeMilli), sizeof(currentTimeMilli), UPayloadType::VALUE);
-
-            /* Build response attributes - the same UUID should be used to send the response 
-             * it is also possible to send the response outside of the callback context */
-            UAttributesBuilder builder(attributes.id(), UMessageType::RESPONSE, UPriority::STANDARD);
-            UAttributes responseAttributes = builder.build();
-
-            /* Send the response */
-            return ZenohUTransport::instance().send(uri, responsePayload, responseAttributes);
-        }
+    
+    RpcListener(void *context) : context_(context) {}
+    
+    UStatus onReceive(UMessage &rcv_umsg) override {
+        
+        /* Construct response payload with the current time */
+        auto currentTime = std::chrono::system_clock::now();
+        auto duration = currentTime.time_since_epoch();
+        uint64_t currentTimeMilli = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+        
+        auto payload = rcv_umsg.payload();
+        auto request_attributes = rcv_umsg.attributes();
+        
+        UPayload responsePayload(reinterpret_cast<const uint8_t*>(&currentTimeMilli), sizeof(currentTimeMilli), UPayloadType::VALUE);
+        
+        /* Build response attributes - the same UUID should be used to send the response 
+         * it is also possible to send the response outside of the callback context */
+        //auto uuid = Uuidv8Factory::create();
+        UAttributesBuilder response = UAttributesBuilder().response(request_attributes.source(),
+                                                                    request_attributes.sink(),
+                                                                    UPriority::UPRIORITY_CS2,
+                                                                    request_attributes.id());
+        UAttributes response_attributes = response.build();
+        
+        /* Send the response */
+        UMessage umsg(payload, response_attributes);
+        RpcServer *rpcServer = (RpcServer *)context_;
+        return rpcServer->send(umsg);
+    }
+private:
+    void *context_;
 };
+
 
 /* The sample RPC server applications demonstrates how to receive RPC requests and send a response back to the client -
  * The response in this example will be the current time */
 int main(int argc, char** argv) {
 
-    RpcListener listener;
-
     signal(SIGINT, signalHandler);
-
-    UStatus status;
-    ZenohUTransport *transport = &ZenohUTransport::instance();
-
+    
+    ZenohSessionManagerConfig config{};
+    
+    RpcServer *transport = new RpcServer(config);
+    auto  status = transport->getSuccess();
+    //ZenohUTransport *transport = &ZenohUTransport::instance();
+    
+    RpcListener listner((void *)transport);
     /* init zenoh utransport */
-    status = transport->init();
+//    status = transport->init();
     if (UCode::OK != status.code()) {
         spdlog::error("ZenohUTransport init failed");
         return -1;
     }
+    
+    
+    auto u_authority = BuildUAuthority().build();
+    auto u_entity = BuildUEntity().setId(8).setMajorVersion(1).build();
+    auto u_resource = BuildUResource().setID(7).build(); //BuildUResource().setID(3).build();
+    auto rpcUri = BuildUUri().setAutority(u_authority).setEntity(u_entity).setResource(u_resource).build();
+    
+    //auto rpcUri = LongUriSerializer::deserialize("/test_rpc.app/1/rpc.milliseconds");
 
-    auto rpcUri = LongUriSerializer::deserialize("/test_rpc.app/1/rpc.milliseconds");
-
+    
     /* register listener to handle RPC requests */
-    status = transport->registerListener(rpcUri, listener);
+    status = transport->registerListener(rpcUri, listner);
     if (UCode::OK != status.code()) {
         spdlog::error("registerListener failed");
         return -1;
@@ -98,18 +125,13 @@ int main(int argc, char** argv) {
         sleep(1);
     }
 
-    status = transport->unregisterListener(rpcUri, listener);
+    status = transport->unregisterListener(rpcUri, listner);
     if (UCode::OK != status.code()) {
         spdlog::error("unregisterListener failed");
         return -1;
     }
 
     /* term zenoh utransport */
-    status = transport->term();
-    if (UCode::OK != status.code()) {
-        spdlog::error("ZenohUTransport term failed");
-        return -1;
-    }
-
+    delete transport;
     return 0;
 }

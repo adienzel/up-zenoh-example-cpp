@@ -24,15 +24,34 @@ cmake_minimum_required(VERSION 3.20)
 project(rpc VERSION 0.1.0 LANGUAGES CXX)
 
 find_package(up-client-zenoh-cpp REQUIRED)
+if(BUILD_UNBUNDLED)
+    find_package(zenohc REQUIRED)
+    set(ZENOH_LIBRARY zenohc::lib)
+else()
+    if(CROSS_COMPILE)
+        find_package(zenohc REQUIRED)
+        set(ZENOH_LIBRARY zenohc::lib)
+    else()
+        find_library(ZENOH_LIB zenohc)
+        set(ZENOH_LIBRARY ${ZENOH_LIB})
+    endif()
+endif()
+
+
 
 # rpc server
-add_executable(rpc_server src/main_rpc_server.cpp)
+add_executable(rpc_server src/main_rpc_server.cpp
+        src/RpcServer.h)
 target_link_libraries(rpc_server
     PRIVATE
-        up-client-zenoh-cpp::up-client-zenoh-cpp)
+        up-client-zenoh-cpp::up-client-zenoh-cpp
+        ${ZENOH_LIBRARY}
+        )
 
 # rpc client
 add_executable(rpc_client src/main_rpc_client.cpp)
 target_link_libraries(rpc_client
     PRIVATE
-        up-client-zenoh-cpp::up-client-zenoh-cpp)
+        up-client-zenoh-cpp::up-client-zenoh-cpp
+        ${ZENOH_LIBRARY}
+        )

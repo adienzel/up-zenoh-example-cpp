@@ -25,14 +25,23 @@
 #include <chrono>
 #include <csignal>
 #include <unistd.h>
+#include <future>
 #include <spdlog/spdlog.h>
+//#include <up-client-zenoh-cpp/transport/zenohUTransport.h>
 #include <up-client-zenoh-cpp/rpc/zenohRpcClient.h>
 #include <up-cpp/uuid/factory/Uuidv8Factory.h>
+#include <up-cpp/transport/builder/UAttributesBuilder.h>
 #include <up-cpp/uri/serializer/LongUriSerializer.h>
+#include <up-cpp/transport/datamodel/UMessage.h>
+
+#include <up-core-api/ustatus.pb.h>
+#include <up-core-api/uri.pb.h>
 
 using namespace uprotocol::utransport;
-using namespace uprotocol::uuid;
 using namespace uprotocol::uri;
+using namespace uprotocol::uuid;
+using namespace uprotocol::v1;
+using namespace uprotocol::rpc;
 
 bool gTerminate = false;
 
@@ -43,51 +52,66 @@ void signalHandler(int signal) {
     }
 }
 
-UPayload sendRPC(UUri& uri) {
-   
-    auto uuid = Uuidv8Factory::create();
-   
-    UAttributesBuilder builder(uuid, UMessageType::REQUEST, UPriority::STANDARD);
-    UAttributes attributes = builder.build();
-  
-    constexpr uint8_t BUFFER_SIZE = 1;
-    uint8_t buffer[BUFFER_SIZE] = {0}; 
-
-    UPayload payload(buffer, sizeof(buffer), UPayloadType::VALUE);
-    /* send the RPC request , a future is returned from invokeMethod */
-    std::future<UPayload> result = ZenohRpcClient::instance().invokeMethod(uri, payload, attributes);
-
-    if (!result.valid()) {
-        spdlog::error("Future is invalid");
-        return UPayload(nullptr, 0, UPayloadType::UNDEFINED);   
+class RpCDemoClient : public ZenohRpcClient {
+public:
+    RpCDemoClient() : ZenohRpcClient() {}
+    ~RpCDemoClient() {}
+    inline auto getSuccess() -> uprotocol::v1::UStatus {
+        return rpcSuccess_;
     }
-    /* wait for the future to be fullfieled - it is possible also to specify a timeout for the future */
-    result.wait();
-
-    return result.get();
-}
+    
+    UPayload sendRPC(UUri &uri) {
+        auto uuid = Uuidv8Factory::create();
+        UAttributesBuilder builder(uri, uuid, UMessageType::UMESSAGE_TYPE_REQUEST, UPriority::UPRIORITY_CS2);
+        UAttributes attributes = builder.build();
+    
+       
+        constexpr uint8_t BUFFER_SIZE = 1;
+        uint8_t buffer[BUFFER_SIZE] = {0};
+        
+        UPayload payload(buffer, sizeof(buffer), UPayloadType::VALUE);
+        /* send the RPC request , a future is returned from invokeMethod */
+        CallOptions callOpt {};
+        std::future<RpcResponse> result = this->invokeMethod(uri, payload, callOpt);
+    
+        if (!result.valid()) {
+            spdlog::error("Future is invalid");
+            return UPayload(nullptr, 0, UPayloadType::UNDEFINED);
+        }
+        /* wait for the future to be fullfieled - it is possible also to specify a timeout for the future */
+        result.wait();
+        auto res = result.get();
+    
+        if (UCode::OK != res.status.code()) {
+            return UPayload(nullptr, 0, UPayloadType::UNDEFINED);
+        }
+    
+        return res.message.payload();
+    }
+};
 
 /* The sample RPC client applications demonstrates how to send RPC requests and wait for the response -
  * The response in this example will be the current time */
 int main(int argc, char** argv) {
    
     signal(SIGINT, signalHandler);
-
-    UStatus status;
-    ZenohRpcClient *rpcClient = &ZenohRpcClient::instance();
-
-    /* init RPC client */
-    status = rpcClient->init();
-    if (UCode::OK != status.code()) {
+    
+    RpCDemoClient *rpc = new RpCDemoClient();
+    if (UCode::OK != rpc->getSuccess().code()) {
         spdlog::error("init failed");
         return -1;
     }
-
-    auto rpcUri = LongUriSerializer::deserialize("/test_rpc.app/1/rpc.milliseconds");
+    
+    auto u_authority = BuildUAuthority().build();
+    auto u_entity = BuildUEntity().setId(8).setMajorVersion(1).build();
+    auto u_resource = BuildUResource().setID(7).build(); //BuildUResource().setID(3).build();
+    auto rpcUri = BuildUUri().setAutority(u_authority).setEntity(u_entity).setResource(u_resource).build();
+    
+    //auto rpcUri = LongUriSerializer::deserialize("/test_rpc.app/1/rpc.milliseconds");
 
     while (!gTerminate) {
 
-        auto response = sendRPC(rpcUri);
+        auto response = rpc->sendRPC(rpcUri);
 
         uint64_t milliseconds = 0;
 
@@ -98,13 +122,8 @@ int main(int argc, char** argv) {
 
         sleep(1);
     }
-
-    /* term RPC client */
-    status = rpcClient->term();
-    if (UCode::OK != status.code()) {
-        spdlog::error("term failed");
-        return -1;
-    }
+    
+    delete rpc;
 
     return 0;
 }
