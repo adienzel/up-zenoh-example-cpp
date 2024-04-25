@@ -63,6 +63,7 @@ auto start_session(const int loops, int msg_size, int max_uri) -> void {
         config.connectKey = "";
         config.qosEnabled = "false";
         config.lowLatency = "true";
+        config.scouting_delay = 0;
     
     
         clock_gettime(CLOCK_MONOTONIC, &start);

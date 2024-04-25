@@ -64,7 +64,7 @@ auto main(const int argc, char **argv) -> int {
     auto p_id = getpid();
     std::vector<std::string> uri_str = getUristr(argc, argv);
     auto dir = getWorkingDir();
-    int msg_size = 200;
+    int msg_size = 800;
     // select number of publishers out of the list will be elected for this run minimum is 2
     //auto number_of_publishers = getRandomInRange(4, uri_str.size() - 1);
     auto number_of_publishers = uri_str.size();
@@ -86,6 +86,7 @@ auto main(const int argc, char **argv) -> int {
     config.connectKey = connect_key;
     config.qosEnabled = "false";
     config.lowLatency = "true";
+    config.scouting_delay = 0;
     
     std::cout << "connect key for publisher " << argv[1] << " is :" << config.connectKey << std::endl;
     

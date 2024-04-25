@@ -190,6 +190,7 @@ auto main(const int argc, char **argv) -> int {
     config.connectKey = "";
     config.qosEnabled = "false";
     config.lowLatency = "true";
+    config.scouting_delay = 0;
     
 //            std::string qosEnabled;
 //    std::string lowLatency;
