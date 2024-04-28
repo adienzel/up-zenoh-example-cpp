@@ -125,7 +125,16 @@ int main(int argc, char **argv) {
     
     ZenohSessionManagerConfig config{};
     //config.listenKey = "[\"unixpipe/pub.pipe\"]";
+    config.connectKey = "[\"unixpipe/pub.pipe\"]";
+    config.listenKey = "";
     //config.connectKey = "[\"unixpipe/pub.pipe\"]";
+    //config.listenKey = listen_key;
+    //config.connectKey = "";
+    config.qosEnabled = "false";
+    config.lowLatency = "true";
+    config.scouting_delay = 0;
+    
+    
     Publisher *pub = new Publisher(config); 
     if (UCode::OK != (pub->getSuccess()).code()) {
         spdlog::error("ZenohUTransport init failed");

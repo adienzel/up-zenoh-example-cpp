@@ -118,8 +118,13 @@ int main(int argc, char** argv) {
 
     signal(SIGINT, signalHandler);
     ZenohSessionManagerConfig config{};
-    //config.listenKey = "[\"unixpipe/pub.pipe\"]";
+    config.listenKey = "[\"unixpipe/pub.pipe\"]";
     //config.connectKey = "[\"unixpipe/pub.pipe\"]";
+    //config.listenKey = listen_key;
+    config.connectKey = "";
+    config.qosEnabled = "false";
+    config.lowLatency = "true";
+    config.scouting_delay = 0;
     
     auto sub = new Subscriber(config);
     if (UCode::OK != (sub->getSuccess()).code()) {
