@@ -27,7 +27,8 @@
 #include <unistd.h>
 #include <future>
 #include <spdlog/spdlog.h>
-//#include <up-client-zenoh-cpp/transport/zenohUTransport.h>
+#include <up-client-zenoh-cpp/transport/zenohUTransport.h>
+#include <up-client-zenoh-cpp/client/upZenohClient.h>
 #include <up-client-zenoh-cpp/rpc/zenohRpcClient.h>
 #include <up-cpp/uuid/factory/Uuidv8Factory.h>
 #include <up-cpp/transport/builder/UAttributesBuilder.h>
@@ -41,6 +42,7 @@ using namespace uprotocol::utransport;
 using namespace uprotocol::uri;
 using namespace uprotocol::uuid;
 using namespace uprotocol::v1;
+using namespace uprotocol::client;
 using namespace uprotocol::rpc;
 
 bool gTerminate = false;
@@ -52,18 +54,24 @@ void signalHandler(int signal) {
     }
 }
 
-class RpCDemoClient : public ZenohRpcClient {
+class RpCDemoClient : public UpZenohClient {
 public:
-    RpCDemoClient() : ZenohRpcClient() {}
+    RpCDemoClient(ZenohSessionManagerConfig &config) : UpZenohClient(config) {}
+//    RpCDemoClient() : ZenohRpcClient() {}
     ~RpCDemoClient() {}
     inline auto getSuccess() -> uprotocol::v1::UStatus {
         return rpcSuccess_;
     }
     
     UPayload sendRPC(UUri &uri) {
-        auto uuid = Uuidv8Factory::create();
-        UAttributesBuilder builder(uri, uuid, UMessageType::UMESSAGE_TYPE_REQUEST, UPriority::UPRIORITY_CS2);
-        UAttributes attributes = builder.build();
+        //static UAttributesBuilder request(const uprotocol::v1::UUri& source, const uprotocol::v1::UUri& sink, uprotocol::v1::UPriority priority, int32_t ttl) {
+        auto u_authority = BuildUAuthority().build();
+        auto u_entity = BuildUEntity().setId(9).setMajorVersion(1).build();
+        auto u_resource = BuildUResource().setID(6).build(); //BuildUResource().setID(3).build();
+        auto sink_uri = BuildUUri().setAutority(u_authority).setEntity(u_entity).setResource(u_resource).build();
+    
+        //auto request_attr = UAttributesBuilder::request(uri, sink_uri, UPriority::UPRIORITY_CS5, 10).build();
+//        UAttributes attributes = builder.build();
     
        
         constexpr uint8_t BUFFER_SIZE = 1;
@@ -72,6 +80,10 @@ public:
         UPayload payload(buffer, sizeof(buffer), UPayloadType::VALUE);
         /* send the RPC request , a future is returned from invokeMethod */
         CallOptions callOpt {};
+        callOpt.set_priority(UPriority::UPRIORITY_CS5);
+        callOpt.set_ttl(150);
+        // TODO set the token later
+        //callOpt.set_token();
         std::future<RpcResponse> result = this->invokeMethod(uri, payload, callOpt);
     
         if (!result.valid()) {
@@ -92,11 +104,21 @@ public:
 
 /* The sample RPC client applications demonstrates how to send RPC requests and wait for the response -
  * The response in this example will be the current time */
-int main(int argc, char** argv) {
+int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv) {
    
     signal(SIGINT, signalHandler);
+    ZenohSessionManagerConfig config{};
+    //config.listenKey = "[\"unixpipe/pub.pipe\"]";
+    config.connectKey = "[\"unixpipe/pub.pipe\"]";
+    config.listenKey = "";
+    //config.connectKey = "[\"unixpipe/pub.pipe\"]";
+    //config.listenKey = listen_key;
+    //config.connectKey = "";
+    config.qosEnabled = "false";
+    config.lowLatency = "true";
+    config.scouting_delay = 0;
     
-    RpCDemoClient *rpc = new RpCDemoClient();
+    RpCDemoClient *rpc = new RpCDemoClient(config);
     if (UCode::OK != rpc->getSuccess().code()) {
         spdlog::error("init failed");
         return -1;
@@ -104,7 +126,7 @@ int main(int argc, char** argv) {
     
     auto u_authority = BuildUAuthority().build();
     auto u_entity = BuildUEntity().setId(8).setMajorVersion(1).build();
-    auto u_resource = BuildUResource().setID(7).build(); //BuildUResource().setID(3).build();
+    auto u_resource = BuildUResource().setRpcRequest(7).build(); //BuildUResource().setID(3).build();
     auto rpcUri = BuildUUri().setAutority(u_authority).setEntity(u_entity).setResource(u_resource).build();
     
     //auto rpcUri = LongUriSerializer::deserialize("/test_rpc.app/1/rpc.milliseconds");
@@ -114,7 +136,9 @@ int main(int argc, char** argv) {
         auto response = rpc->sendRPC(rpcUri);
 
         uint64_t milliseconds = 0;
-
+        if (response.data() == nullptr) {
+            spdlog::error("Received error");
+        }
         if (response.data() != nullptr && response.size() >= sizeof(uint64_t)) {
             memcpy(&milliseconds, response.data(), sizeof(uint64_t));
             spdlog::info("Received = {}", milliseconds);

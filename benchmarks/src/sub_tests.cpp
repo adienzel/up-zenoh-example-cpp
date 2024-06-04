@@ -90,8 +90,10 @@ public:
             status.set_code(UCode::INVALID_ARGUMENT);
             return status;
         }
-        auto counter = std::strtol(split_data[1].c_str(), &endptr, 10);
-        count_arraived++;
+    
+        if (counter == 0) { // get the first counter arrived
+            counter = std::strtol(split_data[1].c_str(), &endptr, 10);
+        }
         messeges_size += data.size();
         // the application instsance
 //        std::cout << "subscriber instance " << split_data[2] 
@@ -113,13 +115,14 @@ public:
     long messeges_size = 0;
 //    int missed_messages = 0;
     std::vector<double> duration_vec {};
+    long counter = 0;
 
 private:
     
 };
 
 
-bool operator<(const UUri& lhs, const UUri& rhs) {
+bool operator<([[maybe_unused]] const UUri& lhs, [[maybe_unused]] const UUri& rhs) {
     return true;
     //return MicroUriSerializer::serialize(lhs) < MicroUriSerializer::serialize(rhs);
 }
@@ -150,15 +153,16 @@ auto main(const int argc, char **argv) -> int {
     std::string file_name = "sub-" + (std::string)argv[1];
     auto path = dir / file_name;
     //std::cout << path << std::endl;
-    auto p_id = getpid();
+//    auto p_id = getpid(); 
+//    auto num_messages = getEnvNumberOfMessages();
+    
     std::vector<std::string> uri_str = getUristr(argc,  argv);
-    auto num_messages = getEnvNumberOfMessages();
     
     std::vector<std::unique_ptr<CustomListener>> listeners;
     UUri* uris = new UUri[uri_str.size()];
     
    
-    for (auto i = 0; i < uri_str.size(); i++) {
+    for (ulong i = 0; i < uri_str.size(); i++) {
         auto str = uri_str[getRandomInRange(0, uri_str.size() - 1)];
         auto vec = convertHexStringToUint8Vec(str);
         uris[i] = MicroUriSerializer::deserialize(vec);
@@ -204,15 +208,15 @@ auto main(const int argc, char **argv) -> int {
     
 //    std::cout << __func__ << ":" <<  __LINE__ << ":  " << argv[0] << ":" << argv[1] << std::endl;
 
-    auto number_of_subscribers = getRandomInRange(4, uri_str.size() - 1);
     std::vector<UUri> subscription;
+//    auto number_of_subscribers = getRandomInRange(4, uri_str.size() - 1);
 //    for (auto i = 0; i < number_of_subscribers; i++) {
 //        auto uri = uris[getRandomInRange(0, uri_str.size() - 1)];
 //        subscription.push_back(uri);
 //        listeners.emplace_back(std::make_unique<CustomListener>());
 //    }
     
-    for (auto i = 0; i < uri_str.size(); i++) {
+    for (ulong i = 0; i < uri_str.size(); i++) {
         subscription.push_back(uris[i]);
         listeners.emplace_back(std::make_unique<CustomListener>());
     }

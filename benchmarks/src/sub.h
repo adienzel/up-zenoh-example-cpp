@@ -41,7 +41,19 @@ using namespace uprotocol::uuid;
 class CustomListener : public UListener {
 public:
     UStatus onReceive(UMessage &umsg) override {
-        std::cout << "got message" << __func__ << ":" << __LINE__ << std::endl;
+        
+        auto attr = umsg.attributes();
+        if (attr.has_source()) {
+            auto source = attr.source();
+            auto empty = isEmpty(source);
+            if (empty) {
+                std::cout << "got message" << __func__ << ":" << __LINE__ << " source is empty" << empty << std::endl;
+            } else  {
+                std::cout << "got message" << __func__ << ":" << __LINE__ << " source exists and not empty" << empty << std::endl;
+            }
+        } else {
+            std::cout << "got message" << __func__ << ":" << __LINE__ << " attributes has no source" << std::endl;
+        }
         UStatus status;
         status.set_code(UCode::OK);
         return status;

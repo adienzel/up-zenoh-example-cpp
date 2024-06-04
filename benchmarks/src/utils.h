@@ -212,7 +212,7 @@ static inline auto convertHexStringToUint8Vec(const std::string &str) -> std::ve
 
 auto static inline createVectorofUUri(size_t size) -> std::vector<uprotocol::v1::UUri> {
     std::vector<uprotocol::v1::UUri> uri_vec {};
-    for (auto i = 1; i <= size; i++) {
+    for (size_t i = 1; i <= size; i++) {
         auto u_authority = uprotocol::uri::BuildUAuthority().build();
         auto u_entity = uprotocol::uri::BuildUEntity().setId(i).setMajorVersion(1).build();
         auto u_resource = uprotocol::uri::BuildUResource().setID((i + 1) << 3).build();
@@ -224,7 +224,7 @@ auto static inline createVectorofUUri(size_t size) -> std::vector<uprotocol::v1:
 
 static inline auto getUristr(int argc,  char **argv) -> std::vector<std::string> {
     std::vector<std::string> uri_str;
-    for (size_t i = 2; i < argc; i++) {
+    for (int i = 2; i < argc; i++) {
         std::string s = argv[i];
         uri_str.push_back(s);
     }

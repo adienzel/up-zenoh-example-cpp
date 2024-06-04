@@ -104,7 +104,7 @@ static inline auto getDirectories(const std::filesystem::path&  directory) -> st
 
 static auto inline remove_directory(const std::filesystem::path&  dir) {
     try {
-        auto num_of_items_removed = std::filesystem::remove_all(dir);
+        std::filesystem::remove_all(dir);
     } catch (const std::filesystem::filesystem_error &e) {
         std::cerr << "Filesystem error : " << e.what() << std::endl;
     }

@@ -23,8 +23,9 @@
 cmake_minimum_required(VERSION 3.20)
 project(benchmark VERSION 0.1.0 LANGUAGES CXX)
 
-find_package(up-client-zenoh-cpp REQUIRED)
+
 if(BUILD_UNBUNDLED)
+#    find_package(up-client-zenoh-cpp REQUIRED)
     find_package(zenohc REQUIRED)
     set(ZENOH_LIBRARY zenohc::lib)
 else()
@@ -48,6 +49,7 @@ add_executable(benc
         src/filesys.h)
 target_link_libraries(benc
         PRIVATE
+        spdlog::spdlog
         up-client-zenoh-cpp::up-client-zenoh-cpp
         ${ZENOH_LIBRARY}
         )
@@ -58,6 +60,7 @@ add_executable(start_time
         src/filesys.h)
 target_link_libraries(start_time
         PRIVATE
+        spdlog::spdlog
         up-client-zenoh-cpp::up-client-zenoh-cpp
         ${ZENOH_LIBRARY}
         )
@@ -70,6 +73,7 @@ add_executable(pub_test
         src/filesys.h)
 target_link_libraries(pub_test
         PRIVATE
+        spdlog::spdlog
         up-client-zenoh-cpp::up-client-zenoh-cpp
         ${ZENOH_LIBRARY}
         )
@@ -81,6 +85,7 @@ add_executable(sub_test
         src/filesys.h)
 target_link_libraries(sub_test
         PRIVATE
+        spdlog::spdlog
         up-client-zenoh-cpp::up-client-zenoh-cpp
         ${ZENOH_LIBRARY}
         )
@@ -92,6 +97,7 @@ add_executable(run_tests
         src/filesys.h)
 target_link_libraries(run_tests
         PRIVATE
+        spdlog::spdlog
         up-client-zenoh-cpp::up-client-zenoh-cpp
         ${ZENOH_LIBRARY}
         )

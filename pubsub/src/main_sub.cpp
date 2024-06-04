@@ -76,7 +76,7 @@ class CustomListener : public UListener {
                 auto resource = uri.resource();
                 auto autority = uri.authority();
                 auto eid = entity.id();
-                auto rid = resource.id();
+                //auto rid = resource.id();
                 
                 if (eid == time_id) {
                     const uint64_t *timeInMilliseconds = reinterpret_cast<const uint64_t *>(payload.data());
@@ -114,7 +114,7 @@ public:
 };
 /* The sample sub applications demonstrates how to consume data using uTransport -
  * There are three topics that are received - random number, current time and a counter */
-int main(int argc, char** argv) {
+int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv) {
 
     signal(SIGINT, signalHandler);
     ZenohSessionManagerConfig config{};

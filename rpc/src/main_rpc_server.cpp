@@ -31,6 +31,10 @@
 #include <up-cpp/transport/builder/UAttributesBuilder.h>
 #include <up-cpp/uri/serializer/MicroUriSerializer.h>
 #include <up-cpp/transport/datamodel/UMessage.h>
+
+#include <up-client-zenoh-cpp/client/upZenohClient.h>
+#include <up-client-zenoh-cpp/rpc/zenohRpcClient.h>
+
 #include "RpcServer.h"
 
 #include <spdlog/spdlog.h>
@@ -39,6 +43,8 @@ using namespace uprotocol::utransport;
 using namespace uprotocol::uuid;
 using namespace uprotocol::uri;
 using namespace uprotocol::v1;
+using namespace uprotocol::client;
+using namespace uprotocol::rpc;
 
 bool gTerminate = false;
 
@@ -52,10 +58,10 @@ void signalHandler(int signal) {
 class RpcListener : public UListener {
     public:
     
-    RpcListener(void *context) : context_(context) {}
+//    RpcListener(void *context) : context_(context) {}
     
     UStatus onReceive(UMessage &rcv_umsg) override {
-        
+        std::cout << __FILE__ << ":" << __func__ << ":" << __LINE__ << " Got Rpc request\n";
         /* Construct response payload with the current time */
         auto currentTime = std::chrono::system_clock::now();
         auto duration = currentTime.time_since_epoch();
@@ -69,16 +75,21 @@ class RpcListener : public UListener {
         /* Build response attributes - the same UUID should be used to send the response 
          * it is also possible to send the response outside of the callback context */
         //auto uuid = Uuidv8Factory::create();
-        UAttributesBuilder response = UAttributesBuilder().response(request_attributes.source(),
-                                                                    request_attributes.sink(),
-                                                                    UPriority::UPRIORITY_CS2,
-                                                                    request_attributes.id());
-        UAttributes response_attributes = response.build();
+    
+    
+        auto response = UAttributesBuilder().response(request_attributes.sink(),
+                                                      request_attributes.source(),
+                                                      request_attributes.priority(),
+                                                      request_attributes.id()).build();
+        //UAttributes response_attributes = response.build();
         
         /* Send the response */
-        UMessage umsg(payload, response_attributes);
-        RpcServer *rpcServer = (RpcServer *)context_;
-        return rpcServer->send(umsg);
+        UMessage umsg(payload, response);
+       // RpcServer *rpcServer = (RpcServer *)context_;
+        //return rpcServer->send(umsg);
+        auto ret =  UpZenohClient::instance()->send(umsg);
+        return ret;
+    
     }
 private:
     void *context_;
@@ -87,32 +98,36 @@ private:
 
 /* The sample RPC server applications demonstrates how to receive RPC requests and send a response back to the client -
  * The response in this example will be the current time */
-int main(int argc, char** argv) {
+int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv) {
 
     signal(SIGINT, signalHandler);
     
     ZenohSessionManagerConfig config{};
+    config.listenKey = "[\"unixpipe/pub.pipe\"]";
+    //config.connectKey = "[\"unixpipe/pub.pipe\"]";
+    //config.listenKey = listen_key;
+    config.connectKey = "";
+    config.qosEnabled = "false";
+    config.lowLatency = "true";
+    config.scouting_delay = 0;
     
     RpcServer *transport = new RpcServer(config);
     auto  status = transport->getSuccess();
-    //ZenohUTransport *transport = &ZenohUTransport::instance();
     
-    RpcListener listner((void *)transport);
     /* init zenoh utransport */
 //    status = transport->init();
     if (UCode::OK != status.code()) {
         spdlog::error("ZenohUTransport init failed");
         return -1;
     }
+    RpcListener listner((void *)transport);
     
     
     auto u_authority = BuildUAuthority().build();
     auto u_entity = BuildUEntity().setId(8).setMajorVersion(1).build();
-    auto u_resource = BuildUResource().setID(7).build(); //BuildUResource().setID(3).build();
+    auto u_resource = BuildUResource().setRpcRequest(7).build(); //BuildUResource().setID(3).build();
     auto rpcUri = BuildUUri().setAutority(u_authority).setEntity(u_entity).setResource(u_resource).build();
     
-    //auto rpcUri = LongUriSerializer::deserialize("/test_rpc.app/1/rpc.milliseconds");
-
     
     /* register listener to handle RPC requests */
     status = transport->registerListener(rpcUri, listner);

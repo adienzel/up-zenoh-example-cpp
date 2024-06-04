@@ -23,8 +23,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(pubsub VERSION 0.1.0 LANGUAGES CXX)
 
-find_package(up-client-zenoh-cpp REQUIRED)
 if(BUILD_UNBUNDLED)
+#    find_package(up-client-zenoh-cpp REQUIRED)
     find_package(zenohc REQUIRED)
     set(ZENOH_LIBRARY zenohc::lib)
 else()
@@ -42,6 +42,7 @@ endif()
 add_executable(sub src/main_sub.cpp)
 target_link_libraries(sub
     PRIVATE
+        spdlog::spdlog
         up-client-zenoh-cpp::up-client-zenoh-cpp
         ${ZENOH_LIBRARY}
         )
@@ -50,6 +51,7 @@ target_link_libraries(sub
 add_executable(pub src/main_pub.cpp)
 target_link_libraries(pub
     PRIVATE
+        spdlog::spdlog
         up-client-zenoh-cpp::up-client-zenoh-cpp
         ${ZENOH_LIBRARY}
         )

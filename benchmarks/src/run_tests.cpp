@@ -142,13 +142,13 @@ auto main(const int argc, char **argv) -> int {
     auto loops_s = std::to_string(loops);
     if (setenv("NUMBER_OF_MESSAGES", loops_s.c_str(), 1) < 0) {
         std::cout << "failed to set environment variable" << std::endl;
-        exit;
+        exit(-1);
     }
     
     auto msg_size_s = std::to_string(message_size);
     if (setenv("MESSAGE_SIZE", msg_size_s.c_str(), 1) < 0) {
         std::cout << "failed to set environment variable" << std::endl;
-        exit;
+        exit(-1);
     }
     
     std::vector<std::string> uri_vec {};

@@ -54,17 +54,17 @@ public :
     }
     
         
-    };
+};
 
 auto main(const int argc, char **argv) -> int {
 //    std::signal(SIGINT, signalHandler);
 //    std::signal(SIGTERM, signalHandler);
 //    std::signal(SIGABRT, signalHandler);
-    auto num_messages = getEnvNumberOfMessages();
-    auto p_id = getpid();
+//    auto num_messages = getEnvNumberOfMessages();
+//    auto p_id = getpid();
     std::vector<std::string> uri_str = getUristr(argc, argv);
     auto dir = getWorkingDir();
-    int msg_size = 800;
+    int msg_size = 200;
     // select number of publishers out of the list will be elected for this run minimum is 2
     //auto number_of_publishers = getRandomInRange(4, uri_str.size() - 1);
     auto number_of_publishers = uri_str.size();
@@ -98,15 +98,16 @@ auto main(const int argc, char **argv) -> int {
     }
     
     std::set<my_uuri> uri; // using of set to avoid duplicates
-    for (auto i = 0; i < number_of_publishers; i++) {
+    for (ulong i = 0; i < number_of_publishers; i++) {
         my_uuri my_uri;
         //auto str = uri_str[getRandomInRange(0, uri_str.size() - 1)];
         auto str = uri_str[i];
         auto vec = convertHexStringToUint8Vec(str);
     
         my_uri.uri = MicroUriSerializer::deserialize(vec);
- 
-        auto res = uri.insert(my_uri);
+
+        uri.insert(my_uri);
+//        auto res = uri.insert(my_uri);
 //        if (!res.second) {
 //            str = uri_str[getRandomInRange(0, uri_str.size() - 1)];
 //            vec.clear();
